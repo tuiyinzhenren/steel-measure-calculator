@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>钢结构吊装机械措施费计算工具</title>
+    <!-- 本地 SheetJS，保证离线可用（原 CDN：https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js） -->
+    <script src="xlsx.full.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1500px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 30px;
+            color: #333;
+            text-align: center;
+        }
+        h2 {
+            font-size: 18px;
+            margin: 25px 0 15px 0;
+            color: #2c5aa0;
+            border-bottom: 2px solid #2c5aa0;
+            padding-bottom: 8px;
+        }
+        h3 {
+            font-size: 15px;
+            margin: 15px 0 10px 0;
+            color: #555;
+        }
+        .form-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        .form-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-item label {
+            font-size: 13px;
+            margin-bottom: 4px;
+            color: #555;
+            font-weight: 500;
+        }
+        .form-item input, .form-item select, .form-item textarea {
+            padding: 7px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .form-item textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 6px 4px;
+            text-align: center;
+            font-size: 12px;
+        }
+        th {
+            background: #f0f4f8;
+            font-weight: 600;
+            color: #333;
+        }
+        td input, td select {
+            width: 100%;
+            padding: 4px 2px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 12px;
+            text-align: center;
+        }
+        td input[readonly] {
+            background: #f5f5f5;
+            color: #333;
+            font-weight: 500;
+        }
+        .btn {
+            padding: 6px 14px;
+            background: #2c5aa0;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            margin: 3px;
+        }
+        .btn:hover { background: #1e4a7a; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #218838; }
+        .btn-lg { padding: 10px 24px; font-size: 15px; }
+        .action-buttons {
+            text-align: center;
+            margin: 25px 0;
+        }
+        .result-box {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 20px;
+            margin-top: 15px;
+        }
+        .result-section {
+            margin-bottom: 20px;
+        }
+        .result-section h3 {
+            color: #2c5aa0;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 6px;
+        }
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        .result-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+        .result-card .label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 6px;
+        }
+        .result-card .value {
+            font-size: 22px;
+            font-weight: bold;
+            color: #2c5aa0;
+        }
+        .result-card .unit {
+            font-size: 12px;
+            color: #888;
+        }
+        .result-card.cost { border-left: 4px solid #28a745; }
+        .result-card.cost .value { color: #28a745; }
+        .result-card.warn { border-left: 4px solid #dc3545; }
+        .result-card.warn .value { color: #dc3545; }
+        .result-card.ok { border-left: 4px solid #28a745; }
+        .ok-msg { color: #28a745; font-weight: bold; }
+        .warn-msg { color: #dc3545; font-weight: bold; }
+        .delete-btn {
+            padding: 3px 8px;
+            font-size: 11px;
+        }
+        .equipment-row { background: #f8fbff; }
+        .hint {
+            color: #999;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        .sub-section {
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0 15px 0;
+        }
+        .fee-summary-table td:last-child {
+            font-weight: bold;
+            color: #2c5aa0;
+        }
+        .total-row {
+            background: #e8f0fe !important;
+            font-weight: bold;
+        }
+        .total-row td { font-weight: bold; }
+        .cost-input { width: 100px !important; }
+        .signature-row td {
+            text-align: left;
+            padding: 10px;
+            border: none;
+            font-size: 13px;
+        }
+        .signature-row td input {
+            border: none;
+            border-bottom: 1px solid #999;
+            width: 150px;
+            text-align: left;
+            font-size: 13px;
+        }
+        .tab-nav {
+            display: flex;
+            border-bottom: 2px solid #2c5aa0;
+            margin-bottom: 15px;
+        }
+        .tab-btn {
+            padding: 8px 20px;
+            background: #f0f4f8;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            cursor: pointer;
+            font-size: 13px;
+            margin-right: 2px;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab-btn.active {
+            background: #2c5aa0;
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>钢结构吊装机械措施费计算工具</h1>
+        
+        <!-- 一、项目基本信息 -->
+        <h2>一、项目基本信息</h2>
+        <div class="form-group">
+            <div class="form-item">
+                <label>工程名称</label>
+                <input type="text" id="projectName" placeholder="如：农林大学体育中心">
+            </div>
+            <div class="form-item">
+                <label>定额版本</label>
+                <select id="quotaVersion" onchange="onQuotaVersionChange()">
+                    <option value="2015">2015版（浙江精工）</option>
+                    <option value="2021" selected>2021版（精工工业建筑·试行）</option>
+                </select>
+            </div>
+            <div class="form-item">
+                <label>合同工期（天）</label>
+                <input type="number" id="contractDays" placeholder="如：120" value="120">
+            </div>
+            <div class="form-item">
+                <label>每月工作天数</label>
+                <input type="number" id="workDaysPerMonth" value="25">
+            </div>
+            <div class="form-item">
+                <label>用钢量（吨）</label>
+                <input type="number" id="steelWeight" placeholder="可选">
+            </div>
+        </div>
+        <div class="form-group" style="grid-template-columns: repeat(auto-fit, minmax(180px,1fr));">
+            <div class="form-item">
+                <label>编制人</label>
+                <input type="text" id="author" placeholder="编制人">
+            </div>
+            <div class="form-item">
+                <label>审核人</label>
+                <input type="text" id="reviewer" placeholder="审核人">
+            </div>
+            <div class="form-item">
+                <label>日期</label>
+                <input type="date" id="docDate">
+            </div>
+        </div>
+
+        <!-- 二、单体结构信息 -->
+        <h2>二、单体结构信息</h2>
+        <p class="hint">为每个单体定义结构类型，后续机械措施会自动关联</p>
+        <table id="buildingTable">
+            <thead>
+                <tr>
+                    <th style="width:50px">序号</th>
+                    <th>单体名称</th>
+                    <th>结构类型</th>
+                    <th>结构高度(m)</th>
+                    <th style="width:70px">操作</th>
+                </tr>
+            </thead>
+            <tbody id="buildingTableBody"></tbody>
+        </table>
+        <button class="btn" onclick="addBuilding()">+ 添加单体</button>
+
+        <!-- 三、机械措施 -->
+        <h2>三、机械措施</h2>
+        <p class="hint">录入设备和构件信息，系统自动查表计算。调整系数可在定额值基础上微调（±20%以内），也可选择"自定义"手动输入效率值。</p>
+        <table id="equipmentTable">
+            <thead>
+                <tr>
+                    <th style="width:35px">序</th>
+                    <th style="width:100px">单体名称</th>
+                    <th style="width:70px">设备类型</th>
+                    <th style="width:100px">设备规格</th>
+                    <th style="width:35px">数量<br>(台)</th>
+                    <th style="width:90px">构件类型</th>
+                    <th style="width:55px">构件<br>数量(件)</th>
+                    <th style="width:50px">单件<br>重量(t)</th>
+                    <th style="width:50px">基准效率</th>
+                    <th style="width:55px">调整<br>系数</th>
+                    <th style="width:55px">实际效率</th>
+                    <th style="width:50px">总<br>台班</th>
+                    <th style="width:50px">所需<br>天数</th>
+                    <th style="width:50px">进出场<br>次数</th>
+                    <th style="width:100px">备注</th>
+                    <th style="width:50px">操作</th>
+                </tr>
+            </thead>
+            <tbody id="equipmentTableBody"></tbody>
+        </table>
+        <button class="btn" onclick="addEquipment()">+ 添加设备配置</button>
+
+        <!-- 四、辅助时间 -->
+        <h2>四、辅助时间配置</h2>
+        <p class="hint">根据定额规定，以下辅助工作需额外占用天数，计入总工期</p>
+        <table id="auxTable">
+            <thead>
+                <tr>
+                    <th>辅助工作内容</th>
+                    <th>适用设备</th>
+                    <th>次数</th>
+                    <th>每次天数</th>
+                    <th>合计天数</th>
+                    <th>备注</th>
+                    <th style="width:50px">操作</th>
+                </tr>
+            </thead>
+            <tbody id="auxTableBody"></tbody>
+        </table>
+        <button class="btn" onclick="addAux()">+ 添加辅助时间项</button>
+
+        <!-- 五、费用单价 -->
+        <h2>五、费用单价</h2>
+        <p class="hint">填写各类设备和辅助的单价，用于汇总费用</p>
+        <div class="sub-section">
+            <h3>设备台班单价</h3>
+            <div class="form-group" style="grid-template-columns: repeat(auto-fit, minmax(220px,1fr));">
+                <div class="form-item">
+                    <label>汽车吊台班单价（元/台班）</label>
+                    <input type="number" id="price_qiche" placeholder="如：5000">
+                </div>
+                <div class="form-item">
+                    <label>履带吊台班单价（元/台班）</label>
+                    <input type="number" id="price_lvdai" placeholder="如：8000">
+                </div>
+                <div class="form-item">
+                    <label>塔吊台班单价（元/台班）</label>
+                    <input type="number" id="price_tadiao" placeholder="如：3000">
+                </div>
+                <div class="form-item">
+                    <label>曲臂车/其他（元/台班）</label>
+                    <input type="number" id="price_other" placeholder="如：2000">
+                </div>
+            </div>
+        </div>
+        <div class="sub-section">
+            <h3>进出场费单价</h3>
+            <div class="form-group" style="grid-template-columns: repeat(auto-fit, minmax(220px,1fr));">
+                <div class="form-item">
+                    <label>汽车吊进出场费（元/次）</label>
+                    <input type="number" id="fee_qiche" placeholder="如：20000">
+                </div>
+                <div class="form-item">
+                    <label>履带吊进出场费（元/次）</label>
+                    <input type="number" id="fee_lvdai" placeholder="如：50000">
+                </div>
+                <div class="form-item">
+                    <label>塔吊进出场费（元/次）</label>
+                    <input type="number" id="fee_tadiao" placeholder="如：80000">
+                </div>
+                <div class="form-item">
+                    <label>其他设备进出场费（元/次）</label>
+                    <input type="number" id="fee_other" placeholder="如：5000">
+                </div>
+            </div>
+        </div>
+        <div class="sub-section">
+            <h3>辅助机械费</h3>
+            <div class="form-group" style="grid-template-columns: repeat(auto-fit, minmax(220px,1fr));">
+                <div class="form-item">
+                    <label>路基箱/配重/轨道倒运（元/天）</label>
+                    <input type="number" id="fee_aux_machine" placeholder="如：3000">
+                </div>
+                <div class="form-item">
+                    <label>辅助人工费（元/天）</label>
+                    <input type="number" id="fee_aux_labor" placeholder="如：2000">
+                </div>
+            </div>
+        </div>
+
+        <!-- 六、材料措施 -->
+        <h2>六、材料措施</h2>
+        <table id="materialTable">
+            <thead>
+                <tr>
+                    <th style="width:35px">序号</th>
+                    <th style="width:100px">单体名称</th>
+                    <th>措施内容</th>
+                    <th style="width:55px">单位</th>
+                    <th style="width:65px">数量</th>
+                    <th style="width:80px">使用时间(天)</th>
+                    <th style="width:100px">备注</th>
+                    <th style="width:50px">操作</th>
+                </tr>
+            </thead>
+            <tbody id="materialTableBody"></tbody>
+        </table>
+        <button class="btn" onclick="addMaterial()">+ 添加材料措施</button>
+
+        <!-- 七、备注事项 -->
+        <h2>七、备注事项</h2>
+        <div class="form-item">
+            <textarea id="remarks" rows="5" placeholder="填写施工方法说明、特殊要求、现场条件等"></textarea>
+        </div>
+
+        <!-- 计算与导出 -->
+        <div class="action-buttons">
+            <button class="btn btn-success btn-lg" onclick="calculateAll()">计 算</button>
+            <button class="btn btn-lg" onclick="exportExcel()" style="background:#6f42c1;">导出Excel</button>
+        </div>
+
+        <!-- 八、计算结果 -->
+        <h2>八、计算结果</h2>
+        <div id="resultContainer" class="result-box">
+            <p style="text-align:center; color:#bbb; padding:30px;">请点击"计算"按钮生成结果</p>
+        </div>
+    </div>
+
+    <script>
+    // ==================== 定额数据 ====================
+    const quotaData = {
+        "2015": {
+            "汽车吊_120t以下": 12, "汽车吊_120-300t": 9, "汽车吊_300t以上": 5,
+            "履带吊_50-130t": 13, "履带吊_150-300t": 9, "履带吊_300t以上_常规": 7, "履带吊_300t以上_超起": 4,
+            "塔吊_50m以下": 16, "塔吊_50-150m": 12, "塔吊_150-250m": 10, "塔吊_250m以上": 9
+        },
+        "2021": {
+            "汽车吊_100t以下": 12, "汽车吊_100-300t": 9, "汽车吊_300t以上": 5,
+            "履带吊_50-150t": 13, "履带吊_150-300t": 9, "履带吊_300t以上_常规": 7, "履带吊_300t以上_超起": 4,
+            "塔吊_50m以下": 16, "塔吊_50-150m": 12, "塔吊_150-250m": 10, "塔吊_250m以上": 9
+        }
+    };
+
+    // 每吊次时间（分钟）- 用于辅助计算
+    const cycleTimeData = {
+        "2015": {
+            "汽车吊_120t以下": 50, "汽车吊_120-300t": 65, "汽车吊_300t以上": 110,
+            "履带吊_50-130t": 45, "履带吊_150-300t": 70, "履带吊_300t以上_常规": 85, "履带吊_300t以上_超起": 135,
+            "塔吊_50m以下": 38, "塔吊_50-150m": 49, "塔吊_150-250m": 62, "塔吊_250m以上": 66
+        },
+        "2021": {
+            "汽车吊_100t以下": 50, "汽车吊_100-300t": 65, "汽车吊_300t以上": 110,
+            "履带吊_50-150t": 45, "履带吊_150-300t": 70, "履带吊_300t以上_常规": 85, "履带吊_300t以上_超起": 135,
+            "塔吊_50m以下": 38, "塔吊_50-150m": 49, "塔吊_150-250m": 62, "塔吊_250m以上": 66
+        }
+    };
+
+    const adjustmentCoefficients = {
+        "单层厂房": {"实腹式柱":1.2,"格构式柱_小":0.75,"格构式柱_大":0.4,"主梁/吊车梁":1.0,"次构件":2.0},
+        "多层结构": {"实腹式柱":1.0,"倾斜柱":0.75,"主梁":1.2,"次梁":1.8},
+        "高层/超高层": {"垂直柱":1.0,"倾斜柱":0.75,"主梁":1.2,"次梁":1.8,"支撑":0.75,"伸臂/环桁架散件":0.6},
+        "空间网架/网壳": {"杆件":2.5,"檩条":3.5,"马道":0.25,"分块吊装":1.0,"补杆":1.5},
+        "空间桁架": {"地面拼装":2.0,"高空拼装":1.5,"主桁架":0.3,"次桁架":0.6},
+        "异形特殊结构": {"异形构件":0.3}
+    };
+
+    const componentOptions = {
+        "单层厂房": ["实腹式柱","格构式柱","主梁/吊车梁","次构件"],
+        "多层结构": ["实腹式柱","倾斜柱","主梁","次梁"],
+        "高层/超高层": ["垂直柱","倾斜柱","主梁","次梁","支撑","伸臂/环桁架散件"],
+        "空间网架/网壳": ["杆件","檩条","马道","分块吊装","补杆"],
+        "空间桁架": ["地面拼装","高空拼装","主桁架","次桁架"],
+        "异形特殊结构": ["异形构件"]
+    };
+
+    const equipmentSpecs = {
+        "2015": {"汽车吊":["120t以下","120-300t","300t以上"],"履带吊":["50-130t","150-300t","300t以上_常规","300t以上_超起"],"塔吊":["50m以下","50-150m","150-250m","250m以上"],"曲臂车":["自定义"]},
+        "2021": {"汽车吊":["100t以下","100-300t","300t以上"],"履带吊":["50-150t","150-300t","300t以上_常规","300t以上_超起"],"塔吊":["50m以下","50-150m","150-250m","250m以上"],"曲臂车":["自定义"]}
+    };
+
+    const structureTypes = ["单层厂房","多层结构","高层/超高层","空间网架/网壳","空间桁架","异形特殊结构"];
+
+    // ==================== 全局计数 ====================
+    let buildingCount = 0, equipmentCount = 0, materialCount = 0, auxCount = 0;
+
+    window.onload = function() {
+        document.getElementById('docDate').value = new Date().toISOString().slice(0,10);
+        addBuilding();
+        addEquipment();
+        addMaterial();
+        addAux();
+    };
+
+    // ==================== 单体管理 ====================
+    function addBuilding() {
+        buildingCount++;
+        const n = buildingCount;
+        const tbody = document.getElementById('buildingTableBody');
+        const tr = document.createElement('tr');
+        tr.id = `bld-${n}`;
+        tr.innerHTML = `
+            <td>${n}</td>
+            <td><input type="text" id="bld-name-${n}" placeholder="如：核心体艺中心" onchange="syncBuildingDropdowns()"></td>
+            <td><select id="bld-type-${n}" onchange="syncComponentOptions()">
+                <option value="">请选择</option>
+                ${structureTypes.map(s=>`<option value="${s}">${s}</option>`).join('')}
+            </select></td>
+            <td><input type="number" id="bld-height-${n}" placeholder="如：30"></td>
+            <td><button class="btn btn-danger delete-btn" onclick="delRow('bld-${n}')">删除</button></td>`;
+        tbody.appendChild(tr);
+    }
+
+    function syncBuildingDropdowns() {
+        const bldList = getBuildingList();
+        // 同步设备表下拉
+        for (let i = 1; i <= equipmentCount; i++) {
+            const sel = document.getElementById(`eq-bld-${i}`);
+            if (!sel) continue;
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">请选择</option>';
+            bldList.forEach(b => { sel.innerHTML += `<option value="${b.id}">${b.name}</option>`; });
+            sel.value = cur;
+        }
+        // 同步材料表下拉
+        for (let i = 1; i <= materialCount; i++) {
+            const sel = document.getElementById(`mat-bld-${i}`);
+            if (!sel) continue;
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">请选择</option>';
+            bldList.forEach(b => { sel.innerHTML += `<option value="${b.id}">${b.name}</option>`; });
+            sel.value = cur;
+        }
+        syncComponentOptions();
+    }
+
+    function getBuildingList() {
+        const list = [];
+        document.querySelectorAll('#buildingTableBody tr').forEach(tr => {
+            const id = tr.id.split('-')[1];
+            const name = document.getElementById(`bld-name-${id}`)?.value?.trim();
+            if (name) list.push({id, name});
+        });
+        return list;
+    }
+
+    // ==================== 机械措施管理 ====================
+    function addEquipment() {
+        equipmentCount++;
+        const n = equipmentCount;
+        const tbody = document.getElementById('equipmentTableBody');
+        const tr = document.createElement('tr');
+        tr.className = 'equipment-row';
+        tr.id = `eq-${n}`;
+
+        const bldOpts = getBuildingList().map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+
+        tr.innerHTML = `
+            <td>${n}</td>
+            <td><select id="eq-bld-${n}" onchange="syncComponentOptions()"><option value="">请选择</option>${bldOpts}</select></td>
+            <td><select id="eq-type-${n}" onchange="updateSpecs(${n})">
+                <option value="">请选择</option>
+                <option value="汽车吊">汽车吊</option>
+                <option value="履带吊">履带吊</option>
+                <option value="塔吊">塔吊</option>
+                <option value="曲臂车">曲臂车/其他</option>
+            </select></td>
+            <td><select id="eq-spec-${n}" onchange="calcRow(${n})"><option value="">请选择规格</option></select></td>
+            <td><input type="number" id="eq-qty-${n}" value="1" min="1" onchange="calcRow(${n})"></td>
+            <td><select id="eq-comp-${n}" onchange="calcRow(${n})">
+                <option value="">请先选单体</option>
+                <option value="自定义">自定义（手填效率）</option>
+            </select></td>
+            <td><input type="number" id="eq-pieces-${n}" placeholder="件数" onchange="calcRow(${n})"></td>
+            <td><input type="number" id="eq-weight-${n}" placeholder="吨/件" step="0.1" onchange="calcRow(${n})"></td>
+            <td><input type="number" id="eq-base-${n}" readonly></td>
+            <td><input type="number" id="eq-coeff-${n}" step="0.01" value="1.00" onchange="calcRow(${n})" title="可微调±20%"></td>
+            <td><input type="number" id="eq-actual-${n}" readonly step="0.1"></td>
+            <td><input type="number" id="eq-shifts-${n}" readonly></td>
+            <td><input type="number" id="eq-days-${n}" readonly></td>
+            <td><input type="number" id="eq-mobilize-${n}" value="1" min="0" onchange="calcRow(${n})"></td>
+            <td><input type="number" id="eq-shift-freq-${n}" value="1" min="1" step="1" onchange="calcRow(${n})" title="每吊次移位次数，默认1次/吊"></td>
+            <td><input type="text" id="eq-remark-${n}" placeholder="备注"></td>
+            <td><button class="btn btn-danger delete-btn" onclick="delRow('eq-${n}')">删除</button></td>`;
+        tbody.appendChild(tr);
+        syncComponentOptions();
+    }
+
+    function updateSpecs(n) {
+        const ver = document.getElementById('quotaVersion').value;
+        const type = document.getElementById(`eq-type-${n}`).value;
+        const sel = document.getElementById(`eq-spec-${n}`);
+        sel.innerHTML = '<option value="">请选择规格</option>';
+        if (type && equipmentSpecs[ver]?.[type]) {
+            equipmentSpecs[ver][type].forEach(s => {
+                sel.innerHTML += `<option value="${s}">${s}</option>`;
+            });
+        }
+        calcRow(n);
+    }
+
+    function syncComponentOptions() {
+        for (let i = 1; i <= equipmentCount; i++) {
+            const bldSel = document.getElementById(`eq-bld-${i}`);
+            const compSel = document.getElementById(`eq-comp-${i}`);
+            if (!bldSel || !compSel) continue;
+
+            const bldId = bldSel.value;
+            const bldRow = document.getElementById(`bld-${bldId}`);
+            const structureType = bldRow ? document.getElementById(`bld-type-${bldId}`)?.value : '';
+            const curVal = compSel.value;
+
+            compSel.innerHTML = '<option value="自定义">自定义（手填效率）</option>';
+            if (structureType && componentOptions[structureType]) {
+                componentOptions[structureType].forEach(c => {
+                    compSel.innerHTML += `<option value="${c}">${c}</option>`;
+                });
+            }
+            compSel.value = curVal;
+        }
+    }
+
+    function onQuotaVersionChange() {
+        for (let i = 1; i <= equipmentCount; i++) {
+            updateSpecs(i);
+            calcRow(i);
+        }
+    }
+
+    // ==================== 材料措施 ====================
+    function addMaterial() {
+        materialCount++;
+        const n = materialCount;
+        const bldOpts = getBuildingList().map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+        const tr = document.createElement('tr');
+        tr.id = `mat-${n}`;
+        tr.innerHTML = `
+            <td>${n}</td>
+            <td><select id="mat-bld-${n}"><option value="">请选择</option>${bldOpts}</select></td>
+            <td><input type="text" id="mat-content-${n}" placeholder="如：格构式支撑，立杆P127*5"></td>
+            <td><input type="text" id="mat-unit-${n}" value="吨"></td>
+            <td><input type="number" id="mat-qty-${n}" placeholder="数量"></td>
+            <td><input type="number" id="mat-days-${n}" placeholder="天数"></td>
+            <td><input type="text" id="mat-remark-${n}" placeholder="备注"></td>
+            <td><button class="btn btn-danger delete-btn" onclick="delRow('mat-${n}')">删除</button></td>`;
+        document.getElementById('materialTableBody').appendChild(tr);
+    }
+
+    // ==================== 辅助时间 ====================
+    function addAux() {
+        auxCount++;
+        const n = auxCount;
+        const tr = document.createElement('tr');
+        tr.id = `aux-${n}`;
+        tr.innerHTML = `
+            <td><select id="aux-work-${n}">
+                <option value="">请选择</option>
+                <option value="塔吊爬升">塔吊爬升（2-3天/次）</option>
+                <option value="内爬塔吊拆除">内爬(外挂)塔吊拆除（7-8天/次，≤15天）</option>
+                <option value="履带吊安拆">履带吊安拆（2-4天/次）</option>
+                <option value="履带吊工况转换">履带吊工况转换/换臂（0.5-1天/次）</option>
+                <option value="路基箱配重倒运">路基箱/配重/轨道倒运</option>
+                <option value="设备进出场占用">设备进出场占用天数</option>
+                <option value="其他">其他</option>
+            </select></td>
+            <td><input type="text" id="aux-eq-${n}" placeholder="如：履带吊200t"></td>
+            <td><input type="number" id="aux-times-${n}" value="1" min="0" onchange="calcAux(${n})"></td>
+            <td><input type="number" id="aux-per-${n}" value="1" step="0.5" min="0" onchange="calcAux(${n})"></td>
+            <td><input type="number" id="aux-total-${n}" readonly></td>
+            <td><input type="text" id="aux-remark-${n}" placeholder="备注"></td>
+            <td><button class="btn btn-danger delete-btn" onclick="delRow('aux-${n}')">删除</button></td>`;
+        document.getElementById('auxTableBody').appendChild(tr);
+    }
+
+    function calcAux(n) {
+        const times = parseFloat(document.getElementById(`aux-times-${n}`)?.value) || 0;
+        const per = parseFloat(document.getElementById(`aux-per-${n}`)?.value) || 0;
+        document.getElementById(`aux-total-${n}`).value = times * per;
+    }
+
+    // ==================== 通用删除 ====================
+    function delRow(rowId) {
+        const el = document.getElementById(rowId);
+        if (el) el.remove();
+        syncBuildingDropdowns();
+    }
+
+    // ==================== 单行计算 ====================
+    function calcRow(n) {
+        const ver = document.getElementById('quotaVersion').value;
+        const eqType = document.getElementById(`eq-type-${n}`)?.value || '';
+        const eqSpec = document.getElementById(`eq-spec-${n}`)?.value || '';
+        let compType = document.getElementById(`eq-comp-${n}`)?.value || '';
+        const pieces = parseFloat(document.getElementById(`eq-pieces-${n}`)?.value) || 0;
+        const weight = parseFloat(document.getElementById(`eq-weight-${n}`)?.value) || 0;
+        const eqQty = parseFloat(document.getElementById(`eq-qty-${n}`)?.value) || 1;
+        const mobilize = parseFloat(document.getElementById(`eq-mobilize-${n}`)?.value) || 0;
+        const coeffInput = parseFloat(document.getElementById(`eq-coeff-${n}`)?.value) || 1.0;
+
+        // 获取结构类型（用于判断格构式柱子类型）
+        const bldId = document.getElementById(`eq-bld-${n}`)?.value;
+        let structureType = '';
+        if (bldId) {
+            const bldRow = document.getElementById(`bld-${bldId}`);
+            if (bldRow) {
+                const bldTypeSelect = bldRow.querySelector('td:nth-child(3) select');
+                if (bldTypeSelect) {
+                    structureType = bldTypeSelect.value;
+                }
+            }
+        }
+
+        // P1功能：格构式柱双条件自动判断（≤5t或高度<20m→小柱0.75；>5t且高度≥20m→大柱0.4）
+        if (compType === '格构式柱' && structureType === '单层厂房') {
+            const height = parseFloat(document.getElementById(`bld-height-${bldId}`)?.value) || 0;
+            compType = (weight <= 5 || height < 20) ? '格构式柱_小' : '格构式柱_大';
+        }
+
+        // 自定义效率
+        if (compType === '自定义') {
+            let baseEff = quotaData[ver]?.[`${eqType}_${eqSpec}`] || 0;
+            document.getElementById(`eq-base-${n}`).value = baseEff || '';
+            const actual = coeffInput; // 自定义模式下，调整系数即为实际效率
+            document.getElementById(`eq-actual-${n}`).value = actual ? actual.toFixed(1) : '';
+            if (pieces > 0 && actual > 0) {
+                const shifts = Math.ceil(pieces / actual);
+                const days = Math.ceil(shifts / eqQty);
+                document.getElementById(`eq-shifts-${n}`).value = shifts;
+                document.getElementById(`eq-days-${n}`).value = days;
+            } else {
+                document.getElementById(`eq-shifts-${n}`).value = '';
+                document.getElementById(`eq-days-${n}`).value = '';
+            }
+            return;
+        }
+
+        // 自动查表
+        const quotaKey = `${eqType}_${eqSpec}`;
+        let baseEff = quotaData[ver]?.[quotaKey];
+        if (baseEff === undefined) { baseEff = 0; }
+        document.getElementById(`eq-base-${n}`).value = baseEff || '';
+
+        // 调整系数（用户可微调）
+        let coeff = coeffInput;
+
+        // P1功能：调整系数±20%验证提示
+        const standardCoeff = adjustmentCoefficients[structureType]?.[compType] || 1.0;
+        if (Math.abs(coeff - standardCoeff) / standardCoeff > 0.2) {
+            document.getElementById(`eq-coeff-${n}`).style.borderColor = '#dc3545';
+            document.getElementById(`eq-coeff-${n}`).title = `警告：调整系数${coeff}超出标准值${standardCoeff}的±20%范围`;
+        } else {
+            document.getElementById(`eq-coeff-${n}`).style.borderColor = '';
+            document.getElementById(`eq-coeff-${n}`).title = `标准系数：${standardCoeff}，当前调整：${((coeff - standardCoeff) / standardCoeff * 100).toFixed(1)}%`;
+        }
+
+        // 实际效率
+        const actual = baseEff * coeff;
+        document.getElementById(`eq-actual-${n}`).value = actual ? actual.toFixed(1) : '';
+
+        // 台班和天数
+        if (pieces > 0 && actual > 0) {
+            const shifts = Math.ceil(pieces / actual);
+            const days = Math.ceil(shifts / eqQty);
+            document.getElementById(`eq-shifts-${n}`).value = shifts;
+            document.getElementById(`eq-days-${n}`).value = days;
+        } else {
+            document.getElementById(`eq-shifts-${n}`).value = '';
+            document.getElementById(`eq-days-${n}`).value = '';
+        }
+    }
+
+    // ==================== 总体计算 ====================
+    function calculateAll() {
+        syncBuildingDropdowns();
+
+        const contractDays = parseFloat(document.getElementById('contractDays').value) || 0;
+        const workDaysPerMonth = parseFloat(document.getElementById('workDaysPerMonth').value) || 25;
+        const steelWeight = parseFloat(document.getElementById('steelWeight').value) || 0;
+
+        // ---- 汇总设备数据 ----
+        const eqRows = document.querySelectorAll('#equipmentTableBody tr');
+        let totalShifts = 0, totalDays = 0;
+        const byType = {};     // 按设备类型汇总
+        const byBld = {};      // 按单体汇总
+        let totalMobilizeCost = 0;
+
+        eqRows.forEach(tr => {
+            const n = tr.id.split('-')[1];
+            const eqType = document.getElementById(`eq-type-${n}`)?.value || '其他';
+            const bldId = document.getElementById(`eq-bld-${n}`)?.value || '';
+            const bldName = bldId ? document.getElementById(`bld-name-${bldId}`)?.value?.trim() || '' : '';
+            const shifts = parseFloat(document.getElementById(`eq-shifts-${n}`)?.value) || 0;
+            const days = parseFloat(document.getElementById(`eq-days-${n}`)?.value) || 0;
+            const qty = parseFloat(document.getElementById(`eq-qty-${n}`)?.value) || 1;
+            const mobilize = parseFloat(document.getElementById(`eq-mobilize-${n}`)?.value) || 0;
+            const spec = document.getElementById(`eq-spec-${n}`)?.value || '';
+            const remark = document.getElementById(`eq-remark-${n}`)?.value || '';
+            const pieces = parseFloat(document.getElementById(`eq-pieces-${n}`)?.value) || 0;
+            const actual = parseFloat(document.getElementById(`eq-actual-${n}`)?.value) || 0;
+
+            totalShifts += shifts;
+            totalDays += days;
+
+            // 按设备类型
+            if (!byType[eqType]) byType[eqType] = {shifts:0, days:0, mobilize:0, count:0};
+            byType[eqType].shifts += shifts;
+            byType[eqType].days += days;
+            byType[eqType].mobilize += mobilize;
+            byType[eqType].count++;
+
+            // 按单体
+            if (bldName) {
+                if (!byBld[bldName]) byBld[bldName] = {shifts:0, days:0};
+                byBld[bldName].shifts += shifts;
+                byBld[bldName].days += days;
+            }
+
+            // 进出场费
+            const mobilizeFeeKey = eqType === '汽车吊' ? 'fee_qiche' : eqType === '履带吊' ? 'fee_lvdai' : eqType === '塔吊' ? 'fee_tadiao' : 'fee_other';
+            const mobilizeUnitFee = parseFloat(document.getElementById(mobilizeFeeKey)?.value) || 0;
+            totalMobilizeCost += mobilize * mobilizeUnitFee;
+        });
+
+        // ---- 辅助时间 ----
+        const auxRows = document.querySelectorAll('#auxTableBody tr');
+        let totalAuxDays = 0;
+        const auxDetails = [];
+        auxRows.forEach(tr => {
+            const n = tr.id.split('-')[1];
+            const work = document.getElementById(`aux-work-${n}`)?.value || '';
+            const eqInfo = document.getElementById(`aux-eq-${n}`)?.value || '';
+            const times = parseFloat(document.getElementById(`aux-times-${n}`)?.value) || 0;
+            const per = parseFloat(document.getElementById(`aux-per-${n}`)?.value) || 0;
+            const total = times * per;
+            totalAuxDays += total;
+            auxDetails.push({work, eqInfo, times, per, total, remark: document.getElementById(`aux-remark-${n}`)?.value || ''});
+        });
+
+        const grandTotalDays = totalDays + totalAuxDays;
+        const months = workDaysPerMonth > 0 ? (grandTotalDays / workDaysPerMonth).toFixed(1) : '0.0';
+
+        // ---- 费用计算 ----
+        const priceKeys = {
+            '汽车吊': 'price_qiche',
+            '履带吊': 'price_lvdai',
+            '塔吊': 'price_tadiao',
+        };
+        let totalShiftCost = 0;
+        const costByType = {};
+        Object.entries(byType).forEach(([type, data]) => {
+            const priceKey = priceKeys[type] || 'price_other';
+            const unitPrice = parseFloat(document.getElementById(priceKey)?.value) || 0;
+            const cost = data.shifts * unitPrice;
+            totalShiftCost += cost;
+            costByType[type] = {shifts: data.shifts, unitPrice, cost};
+        });
+
+        const auxMachineFee = parseFloat(document.getElementById('fee_aux_machine')?.value) || 0;
+        const auxLaborFee = parseFloat(document.getElementById('fee_aux_labor')?.value) || 0;
+        const auxOtherCost = (auxMachineFee + auxLaborFee) * totalAuxDays;
+
+        const totalCost = totalShiftCost + totalMobilizeCost + auxOtherCost;
+        const costPerTon = steelWeight > 0 ? (totalCost / steelWeight).toFixed(2) : '-';
+
+        // ---- 渲染结果 ----
+        let html = '';
+
+        // 概览卡片
+        html += '<div class="result-grid">';
+        html += `<div class="result-card"><div class="label">总吊装台班</div><div class="value">${totalShifts}</div><div class="unit">台班</div></div>`;
+        html += `<div class="result-card"><div class="label">纯吊装天数</div><div class="value">${totalDays}</div><div class="unit">天</div></div>`;
+        html += `<div class="result-card"><div class="label">辅助占用天数</div><div class="value">${totalAuxDays}</div><div class="unit">天</div></div>`;
+        html += `<div class="result-card"><div class="label">总需求天数</div><div class="value">${grandTotalDays}</div><div class="unit">天（约${months}月）</div></div>`;
+
+        // 工期判断
+        if (contractDays > 0) {
+            const diff = contractDays - grandTotalDays;
+            if (diff >= 0) {
+                html += `<div class="result-card ok"><div class="label">工期校核</div><div class="value">${diff}</div><div class="unit">天富余 ✓</div></div>`;
+            } else {
+                html += `<div class="result-card warn"><div class="label">工期校核</div><div class="value">超${Math.abs(diff)}天</div><div class="unit">需增加设备 ⚠</div></div>`;
+            }
+        }
+
+        html += `<div class="result-card cost"><div class="label">措施费合计</div><div class="value">¥${totalCost.toLocaleString()}</div><div class="unit">${steelWeight>0 ? '折合'+costPerTon+'元/吨' : ''}</div></div>`;
+        html += '</div>';
+
+        // 按设备类型汇总
+        html += '<div class="result-section"><h3>按设备类型汇总</h3><table><thead><tr>';
+        html += '<th>设备类型</th><th>总台班</th><th>总台数</th><th>进出场次</th><th>台班单价(元)</th><th>台班费(元)</th><th>进出场费(元)</th><th>小计(元)</th>';
+        html += '</tr></thead><tbody>';
+        let sumShiftFee = 0, sumMobilizeFee = 0;
+        Object.entries(byType).forEach(([type, data]) => {
+            const ci = costByType[type] || {};
+            const mobilizeFeeKey = type === '汽车吊' ? 'fee_qiche' : type === '履带吊' ? 'fee_lvdai' : type === '塔吊' ? 'fee_tadiao' : 'fee_other';
+            const mobilizeUnitFee = parseFloat(document.getElementById(mobilizeFeeKey)?.value) || 0;
+            const mCost = data.mobilize * mobilizeUnitFee;
+            sumShiftFee += ci.cost || 0;
+            sumMobilizeFee += mCost;
+            html += `<tr><td>${type}</td><td>${data.shifts}</td><td>${data.count}</td><td>${data.mobilize}</td><td>${ci.unitPrice||0}</td><td>${(ci.cost||0).toLocaleString()}</td><td>${mCost.toLocaleString()}</td><td>${((ci.cost||0)+mCost).toLocaleString()}</td></tr>`;
+        });
+        if (auxOtherCost > 0) {
+            html += `<tr><td>辅助机械/人工</td><td>-</td><td>-</td><td>${totalAuxDays}天</td><td>${auxMachineFee+auxLaborFee}</td><td>-</td><td>-</td><td>${auxOtherCost.toLocaleString()}</td></tr>`;
+        }
+        html += `<tr class="total-row"><td>合计</td><td>${totalShifts}</td><td>-</td><td>-</td><td>-</td><td>${sumShiftFee.toLocaleString()}</td><td>${sumMobilizeFee.toLocaleString()}</td><td>${(totalCost).toLocaleString()}</td></tr>`;
+        html += '</tbody></table></div>';
+
+        // 按单体汇总
+        if (Object.keys(byBld).length > 0) {
+            html += '<div class="result-section"><h3>按单体汇总</h3><table><thead><tr>';
+            html += '<th>单体名称</th><th>总台班</th><th>吊装天数</th>';
+            html += '</tr></thead><tbody>';
+            Object.entries(byBld).forEach(([name, data]) => {
+                html += `<tr><td>${name}</td><td>${data.shifts}</td><td>${data.days}</td></tr>`;
+            });
+            html += `<tr class="total-row"><td>合计</td><td>${totalShifts}</td><td>${totalDays}</td></tr>`;
+            html += '</tbody></table></div>';
+        }
+
+        // 辅助时间明细
+        if (auxDetails.length > 0) {
+            html += '<div class="result-section"><h3>辅助时间明细</h3><table><thead><tr>';
+            html += '<th>辅助工作</th><th>适用设备</th><th>次数</th><th>每次天数</th><th>合计天数</th><th>备注</th>';
+            html += '</tr></thead><tbody>';
+            auxDetails.forEach(a => {
+                html += `<tr><td>${a.work}</td><td>${a.eqInfo}</td><td>${a.times}</td><td>${a.per}</td><td>${a.total}</td><td>${a.remark}</td></tr>`;
+            });
+            html += `<tr class="total-row"><td colspan="4">合计</td><td>${totalAuxDays}</td><td></td></tr>`;
+            html += '</tbody></table></div>';
+        }
+
+        // 费用明细
+        html += '<div class="result-section"><h3>费用明细</h3><table class="fee-summary-table"><thead><tr>';
+        html += '<th>费用项目</th><th>金额（元）</th>';
+        html += '</tr></thead><tbody>';
+        html += `<tr><td>设备台班费</td><td>${sumShiftFee.toLocaleString()}</td></tr>`;
+        html += `<tr><td>设备进出场费</td><td>${sumMobilizeFee.toLocaleString()}</td></tr>`;
+        html += `<tr><td>辅助机械/人工费</td><td>${auxOtherCost.toLocaleString()}</td></tr>`;
+        html += `<tr class="total-row"><td>措施费合计</td><td>¥${totalCost.toLocaleString()}</td></tr>`;
+        if (steelWeight > 0) {
+            html += `<tr><td>折合单价（元/吨）</td><td>¥${costPerTon}</td></tr>`;
+        }
+        html += '</tbody></table></div>';
+
+        document.getElementById('resultContainer').innerHTML = html;
+    }
+
+    // ==================== 导出Excel ====================
+    function exportExcel() {
+        const projectName = document.getElementById('projectName').value || '未命名工程';
+        const author = document.getElementById('author').value || '';
+        const reviewer = document.getElementById('reviewer').value || '';
+        const docDate = document.getElementById('docDate').value || '';
+        const steelWeight = document.getElementById('steelWeight').value || '';
+        const remarks = document.getElementById('remarks').value || '';
+
+        const wb = XLSX.utils.book_new();
+        const data = [];
+
+        // 标题行
+        data.push([`${projectName}`]);
+        data.push([]);
+
+        // 机械措施
+        data.push(['机械措施']);
+        data.push(['序号','单体名称','机械类型','型号','单位','数量','使用时间(天)','备注']);
+
+        let seq = 1;
+        document.querySelectorAll('#equipmentTableBody tr').forEach(tr => {
+            const n = tr.id.split('-')[1];
+            const bldId = document.getElementById(`eq-bld-${n}`)?.value || '';
+            const bldName = bldId ? document.getElementById(`bld-name-${bldId}`)?.value?.trim() || '' : '';
+            const eqType = document.getElementById(`eq-type-${n}`)?.value || '';
+            const eqSpec = document.getElementById(`eq-spec-${n}`)?.value || '';
+            const qty = document.getElementById(`eq-qty-${n}`)?.value || '';
+            const days = document.getElementById(`eq-days-${n}`)?.value || '';
+            const mobilize = document.getElementById(`eq-mobilize-${n}`)?.value || '';
+            const remark = document.getElementById(`eq-remark-${n}`)?.value || '';
+            const fullRemark = [remark, `进出场${mobilize}次`].filter(Boolean).join('; ');
+
+            data.push([seq++, bldName, eqType, eqSpec, '台', qty, days, fullRemark]);
+        });
+
+        // 辅助时间
+        const auxRows = document.querySelectorAll('#auxTableBody tr');
+        let hasAux = false;
+        auxRows.forEach(tr => {
+            const n = tr.id.split('-')[1];
+            const work = document.getElementById(`aux-work-${n}`)?.value || '';
+            if (work) {
+                hasAux = true;
+                const eqInfo = document.getElementById(`aux-eq-${n}`)?.value || '';
+                const total = document.getElementById(`aux-total-${n}`)?.value || '';
+                const auxRemark = document.getElementById(`aux-remark-${n}`)?.value || '';
+                data.push([seq++, '', '辅助时间', work, '天', '', total, `${eqInfo} ${auxRemark}`.trim()]);
+            }
+        });
+
+        data.push([]);
+
+        // 材料措施
+        data.push(['材料措施']);
+        data.push(['序号','单体名称','措施内容','单位','数量','使用时间(天)','备注']);
+        seq = 1;
+        document.querySelectorAll('#materialTableBody tr').forEach(tr => {
+            const n = tr.id.split('-')[1];
+            const bldId = document.getElementById(`mat-bld-${n}`)?.value || '';
+            const bldName = bldId ? document.getElementById(`bld-name-${bldId}`)?.value?.trim() || '' : '';
+            data.push([seq++, bldName,
+                document.getElementById(`mat-content-${n}`)?.value || '',
+                document.getElementById(`mat-unit-${n}`)?.value || '',
+                document.getElementById(`mat-qty-${n}`)?.value || '',
+                document.getElementById(`mat-days-${n}`)?.value || '',
+                document.getElementById(`mat-remark-${n}`)?.value || '']);
+        });
+
+        data.push([]);
+
+        // 备注
+        data.push(['备注事项']);
+        data.push([remarks]);
+
+        data.push([]);
+
+        // 签名栏
+        data.push([`编制人：${author}`, '', `审核人：${reviewer}`, '', `日期：${docDate}`]);
+
+        // 技术措施费
+        if (steelWeight) {
+            data.push([`技术措施费：`, '', `用钢量：${steelWeight}吨`]);
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(data);
+
+        // 列宽
+        ws['!cols'] = [
+            {wch:6},{wch:16},{wch:12},{wch:18},{wch:6},{wch:8},{wch:12},{wch:25}
+        ];
+
+        // 合并单元格 - 标题行
+        ws['!merges'] = [
+            {s:{r:0,c:0}, e:{r:0,c:7}},  // 标题
+            {s:{r:2,c:0}, e:{r:2,c:7}},  // 机械措施标题
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, '4措施');
+        XLSX.writeFile(wb, `${projectName}_机械措施表.xlsx`);
+    }
+    </script>
+</body>
+</html>
