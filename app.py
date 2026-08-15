@@ -14,6 +14,29 @@ st.set_page_config(
     layout="wide"
 )
 
+# 全局样式：与离线 HTML 版保持一致的蓝白主题
+st.markdown("""
+<style>
+    .stApp { background: #f5f5f5; }
+    .block-container { max-width: 1500px; padding-top: 1.5rem; padding-bottom: 3rem; }
+    h1 { color: #2c5aa0; text-align: center; font-weight: 700; }
+    h2 { color: #2c5aa0; border-bottom: 2px solid #2c5aa0; padding-bottom: 8px; margin-top: 1.8rem; font-size: 1.35rem; }
+    h3 { color: #2c5aa0; font-size: 1.05rem; margin-top: 1.2rem; }
+    .stButton > button, button[kind="secondary"] { border-radius: 4px; font-size: 13px; }
+    .stButton > button:hover { border-color: #2c5aa0; color: #2c5aa0; }
+    button[kind="primary"], [data-testid="stBaseButton-primary"] { background: #2c5aa0 !important; border-color: #2c5aa0 !important; color: #fff !important; }
+    button[kind="primary"]:hover, [data-testid="stBaseButton-primary"]:hover { background: #1e4a7a !important; color: #fff !important; }
+    .stTextInput input, .stNumberInput input, .stTextArea textarea { border-radius: 4px; }
+    .stTextInput input:focus, .stNumberInput input:focus { border-color: #2c5aa0; box-shadow: 0 0 0 1px #2c5aa0; }
+    [data-testid="stMetric"] { background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    [data-testid="stMetricLabel"] { color: #888; }
+    [data-testid="stMetricValue"] { color: #2c5aa0; font-weight: 700; }
+    [data-testid="stExpander"] { border: 1px solid #eee; border-radius: 6px; background: #fafafa; }
+    .stAlert { border-radius: 4px; }
+    .stCaption { color: #888; }
+</style>
+""", unsafe_allow_html=True)
+
 # 初始化session_state
 if 'buildings' not in st.session_state:
     st.session_state.buildings = []
@@ -74,6 +97,22 @@ EQUIPMENT_SPECS = {
 }
 
 STRUCTURE_TYPES = ["单层厂房", "多层结构", "高层/超高层", "空间网架/网壳", "空间桁架", "异形特殊结构"]
+
+
+def style_result_table(df):
+    """结果表格样式与 HTML 版一致：灰蓝表头、单元格居中加边框、末行合计高亮"""
+    return df.style.set_table_styles([
+        {"selector": "thead tr th",
+         "props": [("background-color", "#f0f4f8"), ("color", "#333"), ("font-weight", "600"),
+                   ("border", "1px solid #ddd"), ("text-align", "center")]},
+        {"selector": "tbody tr td",
+         "props": [("border", "1px solid #ddd"), ("text-align", "center"), ("padding", "4px 6px")]},
+        {"selector": "tbody tr:last-child",
+         "props": [("background-color", "#e8f0fe"), ("font-weight", "bold")]},
+        {"selector": "tbody tr:last-child td",
+         "props": [("background-color", "#e8f0fe"), ("font-weight", "bold")]}
+    ]).set_properties(**{"font-size": "13px"}).hide(axis="index")
+
 
 # 标题
 st.title("🏗️ 钢结构吊装机械措施费计算工具")
@@ -530,7 +569,7 @@ if st.session_state.calc_results:
         "小计(元)": r['total_cost']
     })
     
-    st.dataframe(pd.DataFrame(type_data), width="stretch", hide_index=True)
+    st.dataframe(style_result_table(pd.DataFrame(type_data)), width="stretch")
     
     # 按单体汇总
     if r['by_bld']:
@@ -547,7 +586,7 @@ if st.session_state.calc_results:
             "总台班": r['total_shifts'],
             "吊装天数": r['total_days']
         })
-        st.dataframe(pd.DataFrame(bld_data), width="stretch", hide_index=True)
+        st.dataframe(style_result_table(pd.DataFrame(bld_data)), width="stretch")
     
     # 辅助时间明细
     if st.session_state.aux_times:
@@ -570,7 +609,7 @@ if st.session_state.calc_results:
             "合计天数": r['total_aux_days'],
             "备注": None
         })
-        st.dataframe(pd.DataFrame(aux_data), width="stretch", hide_index=True)
+        st.dataframe(style_result_table(pd.DataFrame(aux_data)), width="stretch")
     
     # 费用明细
     st.subheader("费用明细")
@@ -583,7 +622,7 @@ if st.session_state.calc_results:
     if steel_weight > 0:
         fee_data.append({"费用项目": "折合单价（元/吨）", "金额（元）": r['cost_per_ton']})
     
-    st.dataframe(pd.DataFrame(fee_data), width="stretch", hide_index=True)
+    st.dataframe(style_result_table(pd.DataFrame(fee_data)), width="stretch")
 
 # ==================== 导出Excel ====================
 if export_clicked and st.session_state.calc_results:
