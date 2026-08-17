@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>钢结构吊装机械措施费计算工具</title>
-    <!-- 本地 SheetJS，保证离线可用（原 CDN：https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js） -->
-    <script src="xlsx.full.min.js"></script>
+    <!-- 本地 ExcelJS，保证离线可用且导出带格式 -->
+    <script src="exceljs.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -951,106 +951,295 @@
         document.getElementById('resultContainer').innerHTML = html;
     }
 
-    // ==================== 导出Excel ====================
+    //     // ==================== 导出Excel（按《机械措施模板》格式） ====================
+    function buildMeasuresWorkbook(d) {
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('4措施');
+
+        const F_TITLE = { name: '等线', size: 14, bold: true };
+        const F_BODY = { name: '宋体', size: 10 };
+        const F_NUM = { name: '等线', size: 10 };
+        const F_BOLD = { name: '等线', size: 10, bold: true };
+        const AL_C = { horizontal: 'center', vertical: 'center', wrapText: true };
+        const AL_CN = { horizontal: 'center', vertical: 'center' };
+        const AL_L = { horizontal: 'left', vertical: 'center', wrapText: true };
+        const BORDER = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+
+        function styleRow(r, font, align, border) {
+            for (let c = 1; c <= 9; c++) {
+                const cell = ws.getCell(r, c);
+                cell.font = font;
+                cell.alignment = align;
+                cell.border = border || BORDER;
+            }
+        }
+        function estHeight(text, perLine, base, cap) {
+            const s = String(text || '');
+            if (!s) return base || 30;
+            const lines = Math.max(1, Math.ceil(s.length / perLine));
+            return Math.max(base || 30, Math.min(cap || 120, lines * 16));
+        }
+
+        // ---- 标题区 ----
+        ws.mergeCells('A1:I1');
+        ws.getCell('A1').value = `工程名称：${d.projectName}`;
+        ws.getCell('A1').font = F_TITLE;
+        ws.getCell('A1').alignment = AL_CN;
+        ws.getRow(1).height = 30;
+
+        ws.mergeCells('A2:I2');
+        ws.getCell('A2').value = '机械措施';
+        ws.getCell('A2').font = F_TITLE;
+        ws.getCell('A2').alignment = AL_CN;
+        ws.getRow(2).height = 22;
+
+        // ---- 机械措施表头 ----
+        let row = 3;
+        const eqHeaders = ['序号', '单体名称', '机械类型', '型号', '单位', '数量', '使用时间(天)', '备注'];
+        eqHeaders.forEach((h, i) => {
+            const cell = ws.getCell(row, i + 1);
+            cell.value = h;
+            cell.font = F_BODY;
+            cell.alignment = AL_C;
+            cell.border = BORDER;
+        });
+        ws.mergeCells('H3:I3');
+        ws.getRow(3).height = 35;
+        row++;
+
+        // ---- 机械措施数据 ----
+        let seq = 1;
+        const eqStart = row;
+        d.equipment.forEach(eq => {
+            ws.getCell(row, 1).value = seq;
+            ws.getCell(row, 2).value = eq.bld;
+            ws.getCell(row, 3).value = eq.type;
+            ws.getCell(row, 4).value = eq.spec;
+            ws.getCell(row, 5).value = '台';
+            ws.getCell(row, 6).value = eq.qty;
+            ws.getCell(row, 7).value = eq.days;
+            ws.getCell(row, 8).value = eq.remark;
+            styleRow(row, F_NUM, AL_C, BORDER);
+            for (let c = 2; c <= 9; c++) ws.getCell(row, c).font = F_BODY;
+            ws.mergeCells(row, 8, row, 9);
+            ws.getRow(row).height = estHeight(eq.remark, 10, 30, 50);
+            seq++;
+            row++;
+        });
+        for (let i = eqStart; i < eqStart + d.equipment.length;) {
+            let j = i;
+            while (j + 1 < eqStart + d.equipment.length && ws.getCell(j + 1, 2).value && ws.getCell(j + 1, 2).value === ws.getCell(i, 2).value) j++;
+            if (j > i) ws.mergeCells(i, 2, j, 2);
+            i = j + 1;
+        }
+
+        // ---- 辅助时间（并入机械措施表） ----
+        d.aux.forEach(a => {
+            if (!a.work) return;
+            ws.getCell(row, 1).value = seq;
+            ws.getCell(row, 3).value = '辅助时间';
+            ws.getCell(row, 4).value = a.work;
+            ws.getCell(row, 5).value = '天';
+            ws.getCell(row, 7).value = a.total;
+            ws.getCell(row, 8).value = a.remark;
+            styleRow(row, F_NUM, AL_C, BORDER);
+            for (let c = 2; c <= 9; c++) ws.getCell(row, c).font = F_BODY;
+            ws.mergeCells(row, 8, row, 9);
+            ws.getRow(row).height = 30;
+            seq++;
+            row++;
+        });
+
+        // ---- 材料措施 ----
+        ws.mergeCells(row, 1, row, 9);
+        ws.getCell(row, 1).value = '材料措施';
+        ws.getCell(row, 1).font = F_TITLE;
+        ws.getCell(row, 1).alignment = AL_CN;
+        ws.getRow(row).height = 30;
+        row++;
+
+        const matHeader = [[1, '序号'], [2, '单体名称'], [3, '措施内容'], [5, '单位'], [6, '数量'], [7, '使用时间(天)'], [8, '备注']];
+        matHeader.forEach(function (pair) {
+            const cell = ws.getCell(row, pair[0]);
+            cell.value = pair[1];
+            cell.font = F_BODY;
+            cell.alignment = AL_C;
+            cell.border = BORDER;
+        });
+        ws.mergeCells(row, 3, row, 4);
+        ws.mergeCells(row, 8, row, 9);
+        ws.getRow(row).height = 30;
+        row++;
+
+        seq = 1;
+        const matStart = row;
+        d.materials.forEach(m => {
+            ws.getCell(row, 1).value = seq;
+            ws.getCell(row, 2).value = m.bld;
+            ws.getCell(row, 3).value = m.content;
+            ws.getCell(row, 5).value = m.unit;
+            ws.getCell(row, 6).value = m.qty;
+            ws.getCell(row, 7).value = m.days;
+            ws.getCell(row, 8).value = m.remark;
+            styleRow(row, F_NUM, AL_C, BORDER);
+            for (let c = 2; c <= 9; c++) ws.getCell(row, c).font = F_BODY;
+            ws.mergeCells(row, 3, row, 4);
+            ws.mergeCells(row, 8, row, 9);
+            ws.getRow(row).height = estHeight(m.content, 16, 30, 60);
+            seq++;
+            row++;
+        });
+        for (let i = matStart; i < matStart + d.materials.length;) {
+            let j = i;
+            while (j + 1 < matStart + d.materials.length && ws.getCell(j + 1, 2).value && ws.getCell(j + 1, 2).value === ws.getCell(i, 2).value) j++;
+            if (j > i) ws.mergeCells(i, 2, j, 2);
+            i = j + 1;
+        }
+
+        // ---- 备注事项 ----
+        ws.mergeCells(row, 1, row, 9);
+        ws.getCell(row, 1).value = '备注事项';
+        ws.getCell(row, 1).font = F_TITLE;
+        ws.getCell(row, 1).alignment = AL_CN;
+        ws.getRow(row).height = 30;
+        row++;
+
+        let rseq = 1;
+        String(d.remarks || '').split('\n').forEach(line => {
+            if (!line.trim()) return;
+            ws.getCell(row, 1).value = rseq;
+            ws.getCell(row, 2).value = line;
+            styleRow(row, F_NUM, AL_C, BORDER);
+            for (let c = 2; c <= 9; c++) ws.getCell(row, c).font = F_BODY;
+            ws.getCell(row, 2).alignment = AL_L;
+            ws.mergeCells(row, 2, row, 9);
+            ws.getRow(row).height = estHeight(line, 45, 30, 120);
+            rseq++;
+            row++;
+        });
+
+        // ---- 签名栏 ----
+        ws.getCell(row, 1).value = '编制人：';
+        ws.getCell(row, 1).font = F_BOLD;
+        ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'center' };
+        ws.getCell(row, 3).value = d.author;
+        ws.getCell(row, 3).font = F_BOLD;
+        ws.getCell(row, 4).value = '审核人：';
+        ws.getCell(row, 4).font = F_BOLD;
+        ws.getCell(row, 4).alignment = { horizontal: 'left', vertical: 'center' };
+        ws.mergeCells(row, 5, row, 6);
+        ws.getCell(row, 7).value = '日期:';
+        ws.getCell(row, 7).font = F_BOLD;
+        const dateCell = ws.getCell(row, 8);
+        dateCell.value = d.docDate ? new Date(d.docDate + 'T00:00:00') : new Date();
+        dateCell.numFmt = 'yyyy"年"m"月"d"日";@';
+        dateCell.font = F_BOLD;
+        dateCell.border = { top: { style: 'thin' } };
+        ws.getRow(row).height = 30;
+        row++;
+
+        ws.getCell(row, 1).value = '销售联系人：';
+        ws.getCell(row, 1).font = F_BOLD;
+        ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'center' };
+        ws.getCell(row, 4).value = '商务负责人：';
+        ws.getCell(row, 4).font = F_BOLD;
+        ws.mergeCells(row, 5, row, 6);
+        ws.getRow(row).height = 30;
+        row++;
+
+        ws.getCell(row, 1).value = '技术措施费：';
+        ws.getCell(row, 1).font = F_BOLD;
+        ws.getCell(row, 1).alignment = { horizontal: 'left', vertical: 'center' };
+        ws.getCell(row, 4).value = '用钢量';
+        ws.getCell(row, 4).font = F_BOLD;
+        ws.mergeCells(row, 5, row, 6);
+        ws.getCell(row, 7).value = '折合';
+        ws.getCell(row, 7).font = F_BOLD;
+        ws.getCell(row, 9).value = '元/吨';
+        ws.getCell(row, 9).font = F_BOLD;
+        if (d.steelWeight && Number(d.steelWeight) > 0) {
+            ws.getCell(row, 5).value = Number(d.steelWeight);
+            ws.getCell(row, 5).font = F_BOLD;
+        }
+        ws.getRow(row).height = 30;
+
+        // ---- 列宽（与模板一致） ----
+        const widths = [3.4, 11.2, 10.1, 12.8, 5.5, 9.1, 10.4, 11.2, 16.4];
+        widths.forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+
+        // ---- 页面设置（与模板一致） ----
+        ws.pageSetup.orientation = 'portrait';
+        ws.pageSetup.paperSize = 9;
+        ws.pageMargins = { left: 0.47, right: 0.39, top: 0.98, bottom: 0.98 };
+
+        return wb;
+    }
+
     function exportExcel() {
         const projectName = document.getElementById('projectName').value || '未命名工程';
-        const author = document.getElementById('author').value || '';
-        const reviewer = document.getElementById('reviewer').value || '';
-        const docDate = document.getElementById('docDate').value || '';
-        const steelWeight = document.getElementById('steelWeight').value || '';
-        const remarks = document.getElementById('remarks').value || '';
-
-        const wb = XLSX.utils.book_new();
-        const data = [];
-
-        // 标题行
-        data.push([`${projectName}`]);
-        data.push([]);
-
-        // 机械措施
-        data.push(['机械措施']);
-        data.push(['序号','单体名称','机械类型','型号','单位','数量','使用时间(天)','备注']);
-
-        let seq = 1;
+        const data = {
+            projectName: projectName,
+            author: document.getElementById('author').value || '',
+            reviewer: document.getElementById('reviewer').value || '',
+            docDate: document.getElementById('docDate').value || '',
+            steelWeight: document.getElementById('steelWeight').value || '',
+            remarks: document.getElementById('remarks').value || '',
+            equipment: [],
+            aux: [],
+            materials: []
+        };
         document.querySelectorAll('#equipmentTableBody tr').forEach(tr => {
             const n = tr.id.split('-')[1];
             const bldId = document.getElementById(`eq-bld-${n}`)?.value || '';
-            const bldName = bldId ? document.getElementById(`bld-name-${bldId}`)?.value?.trim() || '' : '';
-            const eqType = document.getElementById(`eq-type-${n}`)?.value || '';
-            const eqSpec = document.getElementById(`eq-spec-${n}`)?.value || '';
-            const qty = document.getElementById(`eq-qty-${n}`)?.value || '';
-            const days = document.getElementById(`eq-days-${n}`)?.value || '';
-            const mobilize = document.getElementById(`eq-mobilize-${n}`)?.value || '';
             const remark = document.getElementById(`eq-remark-${n}`)?.value || '';
-            const fullRemark = [remark, `进出场${mobilize}次`].filter(Boolean).join('; ');
-
-            data.push([seq++, bldName, eqType, eqSpec, '台', qty, days, fullRemark]);
+            const mobilize = document.getElementById(`eq-mobilize-${n}`)?.value || '';
+            data.equipment.push({
+                bld: bldId ? document.getElementById(`bld-name-${bldId}`)?.value?.trim() || '' : '',
+                type: document.getElementById(`eq-type-${n}`)?.value || '',
+                spec: document.getElementById(`eq-spec-${n}`)?.value || '',
+                qty: document.getElementById(`eq-qty-${n}`)?.value || '',
+                days: document.getElementById(`eq-days-${n}`)?.value || '',
+                mobilize: mobilize,
+                remark: [remark, `进出场${mobilize}次`].filter(Boolean).join('; ')
+            });
         });
-
-        // 辅助时间
-        const auxRows = document.querySelectorAll('#auxTableBody tr');
-        let hasAux = false;
-        auxRows.forEach(tr => {
+        document.querySelectorAll('#auxTableBody tr').forEach(tr => {
             const n = tr.id.split('-')[1];
             const work = document.getElementById(`aux-work-${n}`)?.value || '';
-            if (work) {
-                hasAux = true;
-                const eqInfo = document.getElementById(`aux-eq-${n}`)?.value || '';
-                const total = document.getElementById(`aux-total-${n}`)?.value || '';
-                const auxRemark = document.getElementById(`aux-remark-${n}`)?.value || '';
-                data.push([seq++, '', '辅助时间', work, '天', '', total, `${eqInfo} ${auxRemark}`.trim()]);
-            }
+            if (!work) return;
+            const eqInfo = document.getElementById(`aux-eq-${n}`)?.value || '';
+            const auxRemark = document.getElementById(`aux-remark-${n}`)?.value || '';
+            data.aux.push({
+                work: work,
+                total: document.getElementById(`aux-total-${n}`)?.value || '',
+                remark: `${eqInfo} ${auxRemark}`.trim()
+            });
         });
-
-        data.push([]);
-
-        // 材料措施
-        data.push(['材料措施']);
-        data.push(['序号','单体名称','措施内容','单位','数量','使用时间(天)','备注']);
-        seq = 1;
         document.querySelectorAll('#materialTableBody tr').forEach(tr => {
             const n = tr.id.split('-')[1];
             const bldId = document.getElementById(`mat-bld-${n}`)?.value || '';
-            const bldName = bldId ? document.getElementById(`bld-name-${bldId}`)?.value?.trim() || '' : '';
-            data.push([seq++, bldName,
-                document.getElementById(`mat-content-${n}`)?.value || '',
-                document.getElementById(`mat-unit-${n}`)?.value || '',
-                document.getElementById(`mat-qty-${n}`)?.value || '',
-                document.getElementById(`mat-days-${n}`)?.value || '',
-                document.getElementById(`mat-remark-${n}`)?.value || '']);
+            data.materials.push({
+                bld: bldId ? document.getElementById(`bld-name-${bldId}`)?.value?.trim() || '' : '',
+                content: document.getElementById(`mat-content-${n}`)?.value || '',
+                unit: document.getElementById(`mat-unit-${n}`)?.value || '',
+                qty: document.getElementById(`mat-qty-${n}`)?.value || '',
+                days: document.getElementById(`mat-days-${n}`)?.value || '',
+                remark: document.getElementById(`mat-remark-${n}`)?.value || ''
+            });
         });
 
-        data.push([]);
-
-        // 备注
-        data.push(['备注事项']);
-        data.push([remarks]);
-
-        data.push([]);
-
-        // 签名栏
-        data.push([`编制人：${author}`, '', `审核人：${reviewer}`, '', `日期：${docDate}`]);
-
-        // 技术措施费
-        if (steelWeight) {
-            data.push([`技术措施费：`, '', `用钢量：${steelWeight}吨`]);
-        }
-
-        const ws = XLSX.utils.aoa_to_sheet(data);
-
-        // 列宽
-        ws['!cols'] = [
-            {wch:6},{wch:16},{wch:12},{wch:18},{wch:6},{wch:8},{wch:12},{wch:25}
-        ];
-
-        // 合并单元格 - 标题行
-        ws['!merges'] = [
-            {s:{r:0,c:0}, e:{r:0,c:7}},  // 标题
-            {s:{r:2,c:0}, e:{r:2,c:7}},  // 机械措施标题
-        ];
-
-        XLSX.utils.book_append_sheet(wb, ws, '4措施');
-        XLSX.writeFile(wb, `${projectName}_机械措施表.xlsx`);
+        const wb = buildMeasuresWorkbook(data);
+        wb.xlsx.writeBuffer().then(buf => {
+            const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${projectName}_机械措施表.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+        });
     }
     </script>
 </body>

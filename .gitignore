@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 .streamlit/secrets.toml
 对话历史.md
+机械措施模板.xlsx
+~$*.xlsx

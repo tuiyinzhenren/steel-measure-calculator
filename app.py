@@ -625,141 +625,253 @@ if st.session_state.calc_results:
     st.dataframe(style_result_table(pd.DataFrame(fee_data)), width="stretch")
 
 # ==================== 导出Excel ====================
-if export_clicked and st.session_state.calc_results:
+
+def build_measures_workbook(project_name, author, reviewer, doc_date, remarks,
+                            steel_weight, equipment, materials, aux_times, calc_results):
+    """按《农林大学项目措施表模板》格式生成 "4措施" 工作簿（A-I列：标题/机械措施/材料措施/备注事项/签名栏）。"""
+    from openpyxl.styles import Border, Side
+
     wb = Workbook()
     ws = wb.active
     ws.title = "4措施"
-    
-    # 标题
-    ws.merge_cells('A1:H1')
-    ws['A1'] = project_name
-    ws['A1'].font = Font(size=16, bold=True)
-    ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
-    
+
+    thin = Side(style="thin")
+    border_thin = Border(left=thin, right=thin, top=thin, bottom=thin)
+    f_title = Font(name="等线", size=14, bold=True)
+    f_body = Font(name="宋体", size=10)
+    f_num = Font(name="等线", size=10)
+    f_bold = Font(name="等线", size=10, bold=True)
+    al_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    al_center_nowrap = Alignment(horizontal="center", vertical="center")
+    al_left = Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+    def style_row(row, font_body=True, align=al_center, border=border_thin):
+        for col in range(1, 10):
+            cell = ws.cell(row=row, column=col)
+            cell.border = border
+            cell.alignment = align
+            cell.font = f_num if col == 1 and font_body else f_body
+
+    def est_height(text, per_line, base=30, cap=120):
+        if not text:
+            return base
+        lines = max(1, math.ceil(len(str(text)) / per_line))
+        return max(base, min(cap, lines * 16))
+
+    # ---- 标题区 ----
+    ws.merge_cells("A1:I1")
+    ws["A1"] = f"工程名称：{project_name}"
+    ws["A1"].font = f_title
+    ws["A1"].alignment = al_center_nowrap
+    ws.row_dimensions[1].height = 30
+
+    ws.merge_cells("A2:I2")
+    ws["A2"] = "机械措施"
+    ws["A2"].font = f_title
+    ws["A2"].alignment = al_center_nowrap
+    ws.row_dimensions[2].height = 22
+
+    # ---- 机械措施表头 ----
     row = 3
-    
-    # 机械措施
-    ws.merge_cells(f'A{row}:H{row}')
-    ws[f'A{row}'] = "机械措施"
-    ws[f'A{row}'].font = Font(bold=True)
-    ws[f'A{row}'].fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
-    row += 1
-    
-    headers = ['序号', '单体名称', '机械类型', '型号', '单位', '数量', '使用时间(天)', '备注']
+    headers = ["序号", "单体名称", "机械类型", "型号", "单位", "数量", "使用时间(天)", "备注"]
     for col, h in enumerate(headers, 1):
         cell = ws.cell(row=row, column=col, value=h)
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill(start_color="E8E8E8", end_color="E8E8E8", fill_type="solid")
-        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.font = f_body
+        cell.alignment = al_center
+        cell.border = border_thin
+    ws.merge_cells("H3:I3")
+    ws.row_dimensions[row].height = 35
     row += 1
-    
+
+    # ---- 机械措施数据 ----
     seq = 1
-    for eq in st.session_state.equipment:
+    eq_start = row
+    for eq in equipment:
         ws.cell(row=row, column=1, value=seq)
-        ws.cell(row=row, column=2, value=eq['building_idx'])
-        ws.cell(row=row, column=3, value=eq['eq_type'].replace("/其他", ""))
-        ws.cell(row=row, column=4, value=eq['eq_spec'])
+        ws.cell(row=row, column=2, value=eq["building_idx"])
+        ws.cell(row=row, column=3, value=eq["eq_type"].replace("/其他", ""))
+        ws.cell(row=row, column=4, value=eq["eq_spec"])
         ws.cell(row=row, column=5, value="台")
-        ws.cell(row=row, column=6, value=eq['eq_qty'])
-        ws.cell(row=row, column=7, value=eq['required_days'])
+        ws.cell(row=row, column=6, value=eq["eq_qty"])
+        ws.cell(row=row, column=7, value=eq["required_days"])
         remark_parts = []
-        if eq['remark']:
-            remark_parts.append(eq['remark'])
+        if eq["remark"]:
+            remark_parts.append(eq["remark"])
         remark_parts.append(f"进出场{eq['mobilize_times']}次")
         ws.cell(row=row, column=8, value="; ".join(remark_parts))
+        style_row(row)
+        ws.merge_cells(start_row=row, start_column=8, end_row=row, end_column=9)
+        ws.row_dimensions[row].height = est_height(eq["remark"], 10, base=30, cap=50)
         seq += 1
         row += 1
-    
-    # 辅助时间
-    for aux in st.session_state.aux_times:
-        if aux['work']:
+
+    # 连续同单体合并 B 列
+    if equipment:
+        i = eq_start
+        last = eq_start + len(equipment) - 1
+        while i <= last:
+            j = i
+            while j + 1 <= last and ws.cell(row=j + 1, column=2).value and \
+                    ws.cell(row=j + 1, column=2).value == ws.cell(row=i, column=2).value:
+                j += 1
+            if j > i:
+                ws.merge_cells(start_row=i, start_column=2, end_row=j, end_column=2)
+            i = j + 1
+
+    # ---- 辅助时间（并入机械措施表） ----
+    for aux in aux_times:
+        if aux["work"]:
             ws.cell(row=row, column=1, value=seq)
-            ws.cell(row=row, column=2, value="")
             ws.cell(row=row, column=3, value="辅助时间")
-            ws.cell(row=row, column=4, value=aux['work'])
+            ws.cell(row=row, column=4, value=aux["work"])
             ws.cell(row=row, column=5, value="天")
-            ws.cell(row=row, column=6, value="")
-            ws.cell(row=row, column=7, value=aux['total'])
+            ws.cell(row=row, column=7, value=aux["total"])
             ws.cell(row=row, column=8, value=f"{aux['eq_info']} {aux['remark']}".strip())
+            style_row(row)
+            ws.merge_cells(start_row=row, start_column=8, end_row=row, end_column=9)
+            ws.row_dimensions[row].height = 30
             seq += 1
             row += 1
-    
+
+    # ---- 材料措施 ----
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=9)
+    ws.cell(row=row, column=1, value="材料措施").font = f_title
+    ws.cell(row=row, column=1).alignment = al_center_nowrap
+    ws.row_dimensions[row].height = 30
     row += 1
-    
-    # 材料措施
-    ws.merge_cells(f'A{row}:H{row}')
-    ws[f'A{row}'] = "材料措施"
-    ws[f'A{row}'].font = Font(bold=True)
-    ws[f'A{row}'].fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
+
+    mat_headers = [("A", "序号"), ("B", "单体名称"), ("C", "措施内容"), ("E", "单位"), ("F", "数量"), ("G", "使用时间(天)"), ("H", "备注")]
+    for col_letter, h in mat_headers:
+        cell = ws[f"{col_letter}{row}"]
+        cell.value = h
+        cell.font = f_body
+        cell.alignment = al_center
+        cell.border = border_thin
+    ws.merge_cells(start_row=row, start_column=3, end_row=row, end_column=4)   # C:D 措施内容
+    ws.merge_cells(start_row=row, start_column=8, end_row=row, end_column=9)   # H:I 备注
+    ws.row_dimensions[row].height = 30
     row += 1
-    
-    headers = ['序号', '单体名称', '措施内容', '单位', '数量', '使用时间(天)', '备注']
-    for col, h in enumerate(headers, 1):
-        cell = ws.cell(row=row, column=col, value=h)
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill(start_color="E8E8E8", end_color="E8E8E8", fill_type="solid")
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-    row += 1
-    
+
     seq = 1
-    for mat in st.session_state.materials:
+    mat_start = row
+    for mat in materials:
         ws.cell(row=row, column=1, value=seq)
-        ws.cell(row=row, column=2, value=mat['building_idx'])
-        ws.cell(row=row, column=3, value=mat['content'])
-        ws.cell(row=row, column=4, value=mat['unit'])
-        ws.cell(row=row, column=5, value=mat['qty'])
-        ws.cell(row=row, column=6, value=mat['days'])
-        ws.cell(row=row, column=7, value=mat['remark'])
+        ws.cell(row=row, column=2, value=mat["building_idx"])
+        ws.cell(row=row, column=3, value=mat["content"])
+        ws.cell(row=row, column=5, value=mat["unit"])
+        ws.cell(row=row, column=6, value=mat["qty"])
+        ws.cell(row=row, column=7, value=mat["days"])
+        ws.cell(row=row, column=8, value=mat["remark"])
+        style_row(row)
+        ws.merge_cells(start_row=row, start_column=3, end_row=row, end_column=4)
+        ws.merge_cells(start_row=row, start_column=8, end_row=row, end_column=9)
+        ws.row_dimensions[row].height = est_height(mat["content"], 16, base=30, cap=60)
         seq += 1
         row += 1
-    
+
+    if materials:
+        i = mat_start
+        last = mat_start + len(materials) - 1
+        while i <= last:
+            j = i
+            while j + 1 <= last and ws.cell(row=j + 1, column=2).value and \
+                    ws.cell(row=j + 1, column=2).value == ws.cell(row=i, column=2).value:
+                j += 1
+            if j > i:
+                ws.merge_cells(start_row=i, start_column=2, end_row=j, end_column=2)
+            i = j + 1
+
+    # ---- 备注事项 ----
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=9)
+    ws.cell(row=row, column=1, value="备注事项").font = f_title
+    ws.cell(row=row, column=1).alignment = al_center_nowrap
+    ws.row_dimensions[row].height = 30
     row += 1
-    
-    # 备注
-    ws.merge_cells(f'A{row}:H{row}')
-    ws[f'A{row}'] = "备注事项"
-    ws[f'A{row}'].font = Font(bold=True)
-    ws[f'A{row}'].fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
+
+    rseq = 1
+    for line in str(remarks).splitlines():
+        if not line.strip():
+            continue
+        ws.cell(row=row, column=1, value=rseq)
+        ws.cell(row=row, column=2, value=line)
+        style_row(row, align=al_center)
+        ws.cell(row=row, column=2).alignment = al_left
+        ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=9)
+        ws.row_dimensions[row].height = est_height(line, 45, base=30, cap=120)
+        rseq += 1
+        row += 1
+
+    # ---- 签名栏 ----
+    ws.cell(row=row, column=1, value="编制人：").font = f_bold
+    ws.cell(row=row, column=1).alignment = Alignment(horizontal="left", vertical="center")
+    ws.cell(row=row, column=3, value=author).font = f_bold
+    ws.cell(row=row, column=4, value="审核人：").font = f_bold
+    ws.cell(row=row, column=4).alignment = Alignment(horizontal="left", vertical="center")
+    ws.merge_cells(start_row=row, start_column=5, end_row=row, end_column=6)
+    ws.cell(row=row, column=7, value="日期:").font = f_bold
+    date_cell = ws.cell(row=row, column=8, value=doc_date)
+    date_cell.font = f_bold
+    date_cell.number_format = 'yyyy"年"m"月"d"日";@'
+    date_cell.border = Border(top=thin)
+    ws.row_dimensions[row].height = 30
     row += 1
-    
-    ws.merge_cells(f'A{row}:H{row}')
-    ws[f'A{row}'] = remarks
-    ws[f'A{row}'].alignment = Alignment(wrap_text=True, vertical='top')
-    ws.row_dimensions[row].height = 80
-    row += 2
-    
-    # 签名栏
-    ws[f'A{row}'] = f"编制人：{author}"
-    ws[f'C{row}'] = f"审核人：{reviewer}"
-    ws[f'E{row}'] = f"日期：{doc_date}"
+
+    ws.cell(row=row, column=1, value="销售联系人：").font = f_bold
+    ws.cell(row=row, column=1).alignment = Alignment(horizontal="left", vertical="center")
+    ws.cell(row=row, column=4, value="商务负责人：").font = f_bold
+    ws.merge_cells(start_row=row, start_column=5, end_row=row, end_column=6)
+    ws.row_dimensions[row].height = 30
     row += 1
-    
-    # 技术措施费
-    if steel_weight > 0:
-        ws[f'A{row}'] = f"技术措施费："
-        ws[f'C{row}'] = f"用钢量：{steel_weight}吨"
-    
-    # 列宽
-    ws.column_dimensions['A'].width = 6
-    ws.column_dimensions['B'].width = 16
-    ws.column_dimensions['C'].width = 12
-    ws.column_dimensions['D'].width = 18
-    ws.column_dimensions['E'].width = 6
-    ws.column_dimensions['F'].width = 8
-    ws.column_dimensions['G'].width = 12
-    ws.column_dimensions['H'].width = 25
-    
-    # 保存到内存
+
+    ws.cell(row=row, column=1, value="技术措施费：").font = f_bold
+    ws.cell(row=row, column=1).alignment = Alignment(horizontal="left", vertical="center")
+    ws.cell(row=row, column=4, value="用钢量").font = f_bold
+    ws.merge_cells(start_row=row, start_column=5, end_row=row, end_column=6)
+    ws.cell(row=row, column=7, value="折合").font = f_bold
+    ws.cell(row=row, column=9, value="元/吨").font = f_bold
+    if steel_weight and steel_weight > 0:
+        ws.cell(row=row, column=5, value=steel_weight).font = f_bold
+        if calc_results and calc_results.get("cost_per_ton"):
+            ws.cell(row=row, column=8, value=round(calc_results["cost_per_ton"], 2)).font = f_bold
+    ws.row_dimensions[row].height = 30
+
+    # ---- 列宽（与模板一致） ----
+    for col, w in {"A": 3.4, "B": 11.2, "C": 10.1, "D": 12.8, "E": 5.5, "F": 9.1,
+                   "G": 10.4, "H": 11.2, "I": 16.4}.items():
+        ws.column_dimensions[col].width = w
+
+    # ---- 页面设置（与模板一致） ----
+    ws.page_setup.orientation = "portrait"
+    ws.page_setup.paperSize = 9
+    ws.page_margins.left = 0.47
+    ws.page_margins.right = 0.39
+    ws.page_margins.top = 0.98
+    ws.page_margins.bottom = 0.98
+
     output = BytesIO()
     wb.save(output)
     output.seek(0)
-    
-    # 提供下载
+    return output
+
+
+if export_clicked and st.session_state.calc_results:
+    output = build_measures_workbook(
+        project_name=project_name,
+        author=author,
+        reviewer=reviewer,
+        doc_date=doc_date,
+        remarks=remarks,
+        steel_weight=steel_weight,
+        equipment=st.session_state.equipment,
+        materials=st.session_state.materials,
+        aux_times=st.session_state.aux_times,
+        calc_results=st.session_state.calc_results,
+    )
     file_name = f"{project_name}_机械措施表.xlsx" if project_name else "机械措施表.xlsx"
     st.download_button(
         label="📥 下载Excel文件",
         data=output,
         file_name=file_name,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        width="stretch"
+        width="stretch",
     )
