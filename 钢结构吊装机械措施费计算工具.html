@@ -432,12 +432,6 @@
             <tbody id="materialTableBody"></tbody>
         </table>
         <button class="btn" onclick="addMaterial()">+ 添加材料措施</button>
-        <datalist id="matPresetList">
-            <option value="格构式支撑架"></option>
-            <option value="圆管撑"></option>
-            <option value="拼装胎架"></option>
-            <option value="提升架"></option>
-        </datalist>
 
         <!-- 七、备注事项 -->
         <h2>七、备注事项</h2>
@@ -514,6 +508,7 @@
     const PROCESS_TYPES = ['提升', '顶推', '顶升'];
     const AUTO_TON_TYPES = ['汽车吊', '履带吊'];
     const TOWER_LABELS = {'50m以下': '≤50m（结构高度）', '50-150m': '50~150m（结构高度）', '150-250m': '150~250m（结构高度）', '250m以上': '≥250m（结构高度）'};
+    const MATERIAL_PRESETS = ['格构式支撑架', '圆管撑', '拼装胎架', '提升架'];
 
     // 汽车吊/履带吊：输入额定吨位 → 自动匹配定额区间
     function detectBucket(ver, type, ton, mode) {
@@ -754,13 +749,64 @@
         tr.innerHTML = `
             <td>${n}</td>
             <td><select id="mat-bld-${n}"><option value="">请选择</option>${bldOpts}</select></td>
-            <td><input type="text" id="mat-content-${n}" list="matPresetList" placeholder="选择或输入：格构式支撑架 / 圆管撑 / 拼装胎架 / 提升架"></td>
+            <td><span id="mat-cell-${n}"></span><input type="hidden" id="mat-content-store-${n}"></td>
             <td><input type="text" id="mat-unit-${n}" value="吨"></td>
             <td><input type="number" id="mat-qty-${n}" placeholder="数量"></td>
             <td><input type="number" id="mat-days-${n}" placeholder="天数"></td>
             <td><input type="text" id="mat-remark-${n}" placeholder="备注"></td>
             <td><button class="btn btn-danger delete-btn" onclick="delRow('mat-${n}')">删除</button></td>`;
         document.getElementById('materialTableBody').appendChild(tr);
+        renderMatSelect(n);
+    }
+
+    // 材料措施内容：下拉（预设/自定义），选"自定义"后切换为输入框
+    function renderMatSelect(n) {
+        const cell = document.getElementById(`mat-cell-${n}`);
+        if (!cell) return;
+        const store = document.getElementById(`mat-content-store-${n}`);
+        const cur = store?.value || '';
+        let selValue = '';
+        if (cur === '__custom' || (cur && !MATERIAL_PRESETS.includes(cur))) selValue = '__custom';
+        else if (MATERIAL_PRESETS.includes(cur)) selValue = cur;
+        let opts = '<option value="">选择措施类型</option>';
+        MATERIAL_PRESETS.forEach(s => {
+            opts += `<option value="${s}">${s}</option>`;
+        });
+        opts += '<option value="__custom">自定义…</option>';
+        cell.innerHTML = `<select id="mat-cat-${n}" onchange="onMatSelect(${n})">${opts}</select>`;
+        document.getElementById(`mat-cat-${n}`).value = selValue;
+    }
+
+    function onMatSelect(n) {
+        const v = document.getElementById(`mat-cat-${n}`)?.value || '';
+        const store = document.getElementById(`mat-content-store-${n}`);
+        if (v === '__custom') {
+            renderMatInput(n);
+            return;
+        }
+        if (store) store.value = v;
+    }
+
+    function renderMatInput(n) {
+        const cell = document.getElementById(`mat-cell-${n}`);
+        if (!cell) return;
+        const store = document.getElementById(`mat-content-store-${n}`);
+        cell.innerHTML = `<input type="text" id="mat-content-${n}" placeholder="请输入措施内容" oninput="onMatInput(${n})">` +
+            `<button type="button" class="btn delete-btn" style="margin-top:2px;" onclick="renderMatSelect(${n})" title="返回选择预设">选项</button>`;
+        const inp = document.getElementById(`mat-content-${n}`);
+        if (store && store.value && store.value !== '__custom') inp.value = store.value;
+        inp.focus();
+    }
+
+    function onMatInput(n) {
+        const store = document.getElementById(`mat-content-store-${n}`);
+        if (store) store.value = document.getElementById(`mat-content-${n}`)?.value || '';
+    }
+
+    function getMatContent(n) {
+        const store = document.getElementById(`mat-content-store-${n}`);
+        if (store && store.value && store.value !== '__custom') return store.value;
+        return '';
     }
 
     // ==================== 非吊装工艺（提升/顶推/顶升） ====================
@@ -1445,7 +1491,7 @@
             const bldId = document.getElementById(`mat-bld-${n}`)?.value || '';
             data.materials.push({
                 bld: bldId ? document.getElementById(`bld-name-${bldId}`)?.value?.trim() || '' : '',
-                content: document.getElementById(`mat-content-${n}`)?.value || '',
+                content: getMatContent(n),
                 unit: document.getElementById(`mat-unit-${n}`)?.value || '',
                 qty: document.getElementById(`mat-qty-${n}`)?.value || '',
                 days: document.getElementById(`mat-days-${n}`)?.value || '',
