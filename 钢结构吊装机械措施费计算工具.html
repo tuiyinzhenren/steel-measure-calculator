@@ -432,6 +432,12 @@
             <tbody id="materialTableBody"></tbody>
         </table>
         <button class="btn" onclick="addMaterial()">+ 添加材料措施</button>
+        <datalist id="matPresetList">
+            <option value="格构式支撑架"></option>
+            <option value="圆管撑"></option>
+            <option value="拼装胎架"></option>
+            <option value="提升架"></option>
+        </datalist>
 
         <!-- 七、备注事项 -->
         <h2>七、备注事项</h2>
@@ -508,7 +514,6 @@
     const PROCESS_TYPES = ['提升', '顶推', '顶升'];
     const AUTO_TON_TYPES = ['汽车吊', '履带吊'];
     const TOWER_LABELS = {'50m以下': '≤50m（结构高度）', '50-150m': '50~150m（结构高度）', '150-250m': '150~250m（结构高度）', '250m以上': '≥250m（结构高度）'};
-    const MATERIAL_PRESETS = ['格构式支撑架', '圆管撑', '拼装胎架', '提升架'];
 
     // 汽车吊/履带吊：输入额定吨位 → 自动匹配定额区间
     function detectBucket(ver, type, ton, mode) {
@@ -749,29 +754,13 @@
         tr.innerHTML = `
             <td>${n}</td>
             <td><select id="mat-bld-${n}"><option value="">请选择</option>${bldOpts}</select></td>
-            <td>
-                <select id="mat-cat-${n}" onchange="onMatCat(${n})">
-                    <option value="">选择类型</option>
-                    ${MATERIAL_PRESETS.map(s=>`<option value="${s}">${s}</option>`).join('')}
-                    <option value="__custom">自定义</option>
-                </select>
-                <input type="text" id="mat-content-${n}" placeholder="如：格构式支撑，立杆P127*5">
-            </td>
+            <td><input type="text" id="mat-content-${n}" list="matPresetList" placeholder="选择或输入：格构式支撑架 / 圆管撑 / 拼装胎架 / 提升架"></td>
             <td><input type="text" id="mat-unit-${n}" value="吨"></td>
             <td><input type="number" id="mat-qty-${n}" placeholder="数量"></td>
             <td><input type="number" id="mat-days-${n}" placeholder="天数"></td>
             <td><input type="text" id="mat-remark-${n}" placeholder="备注"></td>
             <td><button class="btn btn-danger delete-btn" onclick="delRow('mat-${n}')">删除</button></td>`;
         document.getElementById('materialTableBody').appendChild(tr);
-    }
-
-    function onMatCat(n) {
-        const cat = document.getElementById(`mat-cat-${n}`)?.value || '';
-        const content = document.getElementById(`mat-content-${n}`);
-        if (!content) return;
-        if (cat && cat !== '__custom') {
-            content.value = cat;
-        }
     }
 
     // ==================== 非吊装工艺（提升/顶推/顶升） ====================
